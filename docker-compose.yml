@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    enviroment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    volumes:
+      - mongo-data:/data/db
+  crawler:
+    build: ./go-crawler
+    depends_on:
+      - mongo
+    enviroment:
+      MONGO_URI: mongodb://root:example@mongo:27017
+    restart: on-failure
+
+volumes:
+  mongo-data:
+
