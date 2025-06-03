@@ -28,6 +28,8 @@ type Page struct {
 	Body  string `bson:"body"`
 }
 
+const MaxBsonSize = 1_000_000
+
 func getWebsiteBody(path string) ([]byte, error) {
 	resp, err := http.Get(path)
 	if err != nil {
@@ -45,9 +47,25 @@ func getWebsiteBody(path string) ([]byte, error) {
 	return data, nil
 }
 
+func bsonStr(str string) string {
+	if len(str) <= MaxBsonSize {
+		return str
+	} else {
+		return str[:MaxBsonSize]
+	}
+}
+
+func createPage(path string, title string, body string) Page {
+	return Page{
+		bsonStr(path),
+		bsonStr(title),
+		bsonStr(body),
+	}
+}
+
 func insertToDb(path string, data []byte, client *mongo.Client) error {
 	title := getTitleOrH1(data)
-	page := Page{path, title, string(data)}
+	page := createPage(path, title, string(data))
 	collection := client.Database("web").Collection("websites")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -28,7 +28,6 @@ services:
       - MONGO_URI=mongodb://mongo:27017
     networks:
       - webclawler-network
-    restart: on-failure
 
 volumes:
   mongo-data:
