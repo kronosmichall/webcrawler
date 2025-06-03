@@ -1,4 +1,5 @@
 #!/bin/bash
+rm src/crawler
 cd src
 ./build.sh
 cd ..

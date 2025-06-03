@@ -11,12 +11,19 @@ services:
       - mongo-data:/data/db
     networks:
       - webclawler-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
   crawler:
     build: 
       context: src/
       dockerfile: Dockerfile
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     environment:
       - MONGO_URI=mongodb://mongo:27017
     networks:

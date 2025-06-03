@@ -131,7 +131,7 @@ func bfs(path string, depth uint, limit uint) {
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {
 		fmt.Println("Could not find uri in env; fallback to localhost")
-		uri = "mongodb://localhost:27017"
+		uri = "mongodb://127.0.0.1:27017"
 	} else {
 		fmt.Printf("getting uri from env: %s\n", uri)
 	}
@@ -166,6 +166,7 @@ func bfs(path string, depth uint, limit uint) {
 }
 
 func main() {
+	// time.Sleep(1000 * time.Second)
 	fmt.Println("Hello world")
 	d := flag.Uint("d", 1, "depth of bfs search")
 	l := flag.Uint("l", 10, "same base url limit of requests")
