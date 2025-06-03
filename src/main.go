@@ -1,108 +1,28 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"regexp"
-	"strings"
-	"time"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"golang.org/x/net/html"
 )
 
 type Result struct {
 	url   string
 	depth uint
 }
-type Page struct {
-	URL   string `bson:"url"`
-	Title string `bson:"title"`
-	Body  string `bson:"body"`
-}
-
-const MaxBsonSize = 1_000_000
-
-func getWebsiteBody(path string) ([]byte, error) {
-	resp, err := http.Get(path)
-	if err != nil {
-		fmt.Println("Error: ", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error", err)
-		return nil, err
-	}
-
-	return data, nil
-}
-
-func bsonStr(str string) string {
-	if len(str) <= MaxBsonSize {
-		return str
-	} else {
-		return str[:MaxBsonSize]
-	}
-}
 
 func createPage(path string, title string, body string) Page {
+	textBody := getBodyText(body)
 	return Page{
 		bsonStr(path),
 		bsonStr(title),
-		bsonStr(body),
+		bsonStr(textBody),
 	}
-}
-
-func insertToDb(path string, data []byte, client *mongo.Client) error {
-	title := getTitleOrH1(data)
-	page := createPage(path, title, string(data))
-	collection := client.Database("web").Collection("websites")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := collection.InsertOne(ctx, page)
-	return err
-}
-
-func getTitleOrH1(body []byte) string {
-	doc, err := html.Parse(bytes.NewReader(body))
-	if err != nil {
-		return ""
-	}
-
-	var title string
-	var h1 string
-
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-			if n.Data == "title" && title == "" && n.FirstChild != nil {
-				title = strings.TrimSpace(n.FirstChild.Data)
-			}
-			if n.Data == "h1" && h1 == "" && n.FirstChild != nil {
-				h1 = strings.TrimSpace(n.FirstChild.Data)
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(doc)
-
-	if title != "" {
-		return title
-	}
-	return h1
 }
 
 func getUrls(body []byte) [][]byte {
@@ -131,7 +51,8 @@ func extractUrlsAndPublish(path string, ch chan Result, depth uint, client *mong
 	}
 	err = insertToDb(path, body, client)
 	if err != nil {
-		panic(err)
+		fmt.Println("Skipping due to db error", err.Error())
+		return
 	}
 
 	urls := getUrls(body)
