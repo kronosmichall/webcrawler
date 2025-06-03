@@ -1,11 +1,8 @@
-FROM golang:1.24-alpine
+FROM alpine:3.14
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY main.go ./
+COPY crawler .
 
-RUN go mod tidy
-RUN go build -o crawler
+CMD ["./crawler", "-d", "10", "-s", "https://en.wikipedia.org/wiki/Website"]
 
-CMD ["./crawler"]
