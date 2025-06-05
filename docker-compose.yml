@@ -4,9 +4,6 @@ services:
     container_name: mongodb
     ports:
       - "27017:27017"
-    # environment:
-    #   MONGO_INITDB_ROOT_USERNAME: root
-    #   MONGO_INITDB_ROOT_PASSWORD: root
     volumes:
       - mongo-data:/data/db
     networks:
@@ -17,12 +14,33 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    ports:
+      - "7475:7474" # http
+      - "7688:7687" # bolt
+    environment:
+      - NEO4J_AUTH=neo4j/12345678
+    volumes:
+      - neo4j-data:/data
+
+    networks:
+      - webclawler-network
+    healthcheck:
+      test: wget http://localhost:7474 || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 20
+      start_period: 3s
   crawler:
     build: 
       context: src/
       dockerfile: Dockerfile
     depends_on:
       mongo:
+        condition: service_healthy
+      neo4j:
         condition: service_healthy
     environment:
       - MONGO_URI=mongodb://mongo:27017
@@ -31,6 +49,7 @@ services:
 
 volumes:
   mongo-data:
+  neo4j-data:
 
 networks:
   webclawler-network:

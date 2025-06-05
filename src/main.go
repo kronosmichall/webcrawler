@@ -4,16 +4,13 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
-	"os"
 	"regexp"
-
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Result struct {
-	url   string
-	depth uint
+	parentUrl string
+	url       string
+	depth     uint
 }
 
 func createPage(path string, title string, body string) Page {
@@ -43,21 +40,41 @@ func getBaseUrl(path string) (string, error) {
 	return u.Host, err
 }
 
-func extractUrlsAndPublish(path string, ch chan Result, depth uint, client *mongo.Client) {
+func insertToNeo4j(url1 string, url2 string, insert func(string, string) error) {
+	base1, err := getBaseUrl(url1)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	base2, err := getBaseUrl(url2)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = insert(base1, base2)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func extractUrlsAndPublish(
+	path string, 
+	ch chan Result, 
+	depth uint, 
+	mongoInsert func(Page) error,
+	neo4jInsert func(string, string) error) {
 	body, err := getWebsiteBody(path)
 	if err != nil {
 		fmt.Println("Skipping site: ", path)
 		return
 	}
-	err = insertToDb(path, body, client)
-	if err != nil {
-		fmt.Println("Skipping due to db error", err.Error())
-		return
-	}
+	go mongoInsertToDb(path, body, mongoInsert)
 
 	urls := getUrls(body)
 	for _, url := range urls {
-		result := Result{string(url), depth + 1}
+		go insertToNeo4j(path, string(url), neo4jInsert)
+		result := Result{path, string(url), depth + 1}
 		ch <- result
 	}
 }
@@ -66,21 +83,18 @@ func bfs(path string, depth uint, limit uint) {
 	ch := make(chan Result)
 	baseRefs := map[string]uint{}
 	refs := map[string]uint{}
-
-	uri := os.Getenv("MONGO_URI")
-	if uri == "" {
-		fmt.Println("Could not find uri in env; fallback to localhost")
-		uri = "mongodb://127.0.0.1:27017"
-	} else {
-		fmt.Printf("getting uri from env: %s\n", uri)
+	neo4jInsert, neo4jCleanup, err := neo4jConnector()
+	if err != nil {
+		panic(err)
 	}
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	defer neo4jCleanup()
+	mongoInsert, err := mongoConnector("web", "websites")
 	if err != nil {
 		panic(err)
 	}
 
 	go func() {
-		ch <- Result{path, 0}
+		ch <- Result{path, path, 0}
 	}()
 
 	for {
@@ -93,7 +107,7 @@ func bfs(path string, depth uint, limit uint) {
 			if refs[result.url] == 0 && baseRefs[baseUrl] < limit && result.depth < depth {
 				refs[result.url] += 1
 				fmt.Println("Visiting ", result.url)
-				go extractUrlsAndPublish(result.url, ch, result.depth, client)
+				go extractUrlsAndPublish(result.url, ch, result.depth, mongoInsert, neo4jInsert)
 			} else {
 				refs[result.url] += 1
 			}

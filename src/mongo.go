@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"os"
 	"time"
-	"unicode/utf8"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -28,16 +29,35 @@ type Page struct {
 	Body  string `bson:"body"`
 }
 
-func insertToDb(path string, data []byte, client *mongo.Client) error {
-	if !utf8.Valid(data) {
-		return errors.New("data is not valid utf-8")
-	}
+func mongoInsertToDb(path string, data []byte, insert func(Page) error) error {
+	// if !utf8.Valid(data) {
+	// 	return errors.New("data is not valid utf-8")
+	// }
 	title := getTitleOrH1(data)
 	page := createPage(path, title, string(data))
-	collection := client.Database("web").Collection("websites")
-	ctx, cancel := context.WithTimeout(context.Background(), InsertTimout)
-	defer cancel()
+	return insert(page)
+}
 
-	_, err := collection.InsertOne(ctx, page)
-	return err
+func mongoConnector(db string, collection string) (func(Page) error, error) {
+	uri := os.Getenv("MONGO_URI")
+
+	if uri == "" {
+		fmt.Println("Could not find uri in env; fallback to localhost")
+		uri = "mongodb://127.0.0.1:27017"
+	} else {
+		fmt.Printf("getting uri from env: %s\n", uri)
+	}
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, err
+	}
+
+	c := client.Database(db).Collection(collection)
+	insert := func(page Page) error {
+		ctx, cancel := context.WithTimeout(context.Background(), InsertTimout)
+		defer cancel()
+		_, err := c.InsertOne(ctx, page)
+		return err
+	}
+	return insert, nil
 }

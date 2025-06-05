@@ -60,6 +60,9 @@ func getTitleOrH1(body []byte) string {
 }
 
 func getText(n *html.Node) string {
+	if n == nil {
+		return ""
+	}
 	if n.Type == html.TextNode {
 		return n.Data
 	}
@@ -71,13 +74,25 @@ func getText(n *html.Node) string {
 	return strings.Join(text, "\n")
 }
 
+func getBodyNode(n *html.Node) *html.Node {
+	if n.Type == html.ElementNode && n.Data == "body" {
+		return n
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if body := getBodyNode(c); body != nil {
+			return body
+		}
+	}
+	return nil
+}
+
 func getBodyText(body string) string {
 	doc, err := html.Parse(bytes.NewBufferString(body))
 	if err != nil {
 		return ""
 	}
-
-	text := getText(doc)
+	bodyNode := getBodyNode(doc)
+	text := getText(bodyNode)
 
 	return NormalizeWhitespace(text)
 }

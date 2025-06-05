@@ -4,5 +4,5 @@ WORKDIR /app
 
 COPY crawler .
 
-CMD ["./crawler", "-d", "10", "-s", "https://en.wikipedia.org/wiki/Website"]
+CMD ["./crawler", "-d", "90", "-s", "https://historyofinformation.com/detail.php?id=1067"]
 
