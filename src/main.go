@@ -52,28 +52,28 @@ func insertToNeo4j(url1 string, url2 string, insert func(string, string) error) 
 		return
 	}
 	err = insert(base1, base2)
-
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("insert", err)
 	}
 }
 
 func extractUrlsAndPublish(
-	path string, 
-	ch chan Result, 
-	depth uint, 
+	path string,
+	ch chan Result,
+	depth uint,
 	mongoInsert func(Page) error,
-	neo4jInsert func(string, string) error) {
+	neo4jInsert func(string, string) error,
+) {
 	body, err := getWebsiteBody(path)
 	if err != nil {
 		fmt.Println("Skipping site: ", path)
 		return
 	}
-	go mongoInsertToDb(path, body, mongoInsert)
+	// go mongoInsertToDb(path, body, mongoInsert)
 
 	urls := getUrls(body)
 	for _, url := range urls {
-		go insertToNeo4j(path, string(url), neo4jInsert)
+		 insertToNeo4j(path, string(url), neo4jInsert)
 		result := Result{path, string(url), depth + 1}
 		ch <- result
 	}
